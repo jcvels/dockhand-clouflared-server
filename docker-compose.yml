@@ -1,0 +1,50 @@
+services:
+  srv-reverse-proxy:
+    image: traefik:latest
+    container_name: srv-reverse-proxy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxied
+    ports:
+      - 80:80
+    command: --entrypoints.web.address=:80 --log.level=INFO --providers.docker=true --providers.docker.exposedbydefault=false --providers.docker.network=proxied
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=false"
+  srv-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: srv-tunnel
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxied
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
+  srv-dockhand:
+    image: fnsys/dockhand:latest
+    container_name: srv-dockhand
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxied
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./dockhand:/app/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dockhand.rule=Host(`${DOCKHAND_DOMAIN}`)"
+      - "traefik.http.services.dockhand.loadbalancer.server.port=3000"
+networks:
+  proxied:
+    name: proxied
+    ipam:
+      config:
+        - subnet: 10.10.10.0/24
+          gateway: 10.10.10.1
