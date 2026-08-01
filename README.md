@@ -72,6 +72,33 @@ docker compose ps
 
 The Cloudflare Tunnel automatically exposes the domain; make sure a DNS route for `DOCKHAND_DOMAIN` points at your tunnel (the tunnel will create this route for you).
 
+## Expose Your Own Apps
+
+Traefik only routes containers that are explicitly labeled — it runs with `--providers.docker.exposedbydefault=false`. To expose another app through the same reverse proxy, attach it to the `proxied` network and add these labels:
+
+- `traefik.enable=true`
+- `traefik.http.routers.<app-name>.rule=Host(`<app-host>.<your-domain>`)`
+
+For example, to expose an app at `myapp.example.com`:
+
+```yaml
+services:
+  myapp:
+    image: nginx:latest
+    networks:
+      - proxied
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.myapp.rule=Host(`myapp.example.com`)"
+      - "traefik.http.services.myapp.loadbalancer.server.port=80"
+```
+
+Notes:
+
+- Replace `<app-name>` with a unique name per app and `<app-host>.<your-domain>` with the subdomain you want (it resolves through the same Cloudflare Tunnel DNS setup).
+- Add `traefik.http.services.<app-name>.loadbalancer.server.port=<port>` only if the app listens on a port other than 80.
+- The container **must** be on the `proxied` network so Traefik can reach it.
+
 ## First Use
 
 1. Open `https://<DOCKHAND_DOMAIN>` (e.g. `https://app.example.com`).
